@@ -150,18 +150,24 @@ export default function App() {
       </div>
     );
 
+  const hadithsStartDate = new Date("2024-12-31"); // or any fixed past date
   const today = new Date();
   const offsetDate = new Date(today);
   offsetDate.setDate(today.getDate() + dayOffset);
-  const getDayOfYear = (date = new Date()) => {
-    const start = new Date(date.getFullYear(), 0, 0);
-    const diff = date - start;
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
-  };
 
+  // Days since start date
+  const daySinceStart = Math.floor(
+    (offsetDate - hadithsStartDate) / (1000 * 60 * 60 * 24)
+  );
+
+  // Safely wrap around hadiths
   const index =
-    hadiths.length > 0 ? getDayOfYear(offsetDate) % hadiths.length : 0;
+    hadiths.length > 0
+      ? ((daySinceStart % hadiths.length) + hadiths.length) % hadiths.length
+      : 0;
+
   const hadith = hadiths[index];
+
   if (index === null) return null;
 
   const gregorianString = offsetDate.toLocaleDateString("en-GB");
@@ -472,21 +478,27 @@ export default function App() {
                     >
                       <button
                         onClick={() => {
+                          // Always use the real current date, not offsetDate
+                          const hadithsStartDate = new Date("2024-12-31");
+                          const today = new Date();
+                          const todayDaySinceStart = Math.floor(
+                            (today - hadithsStartDate) / (1000 * 60 * 60 * 24)
+                          );
                           const favIndex = hadiths.findIndex(
                             (h) => h.id === fav.id
                           );
-                          const totalHadiths = hadiths.length;
-                          const todayIndex =
-                            getDayOfYear(new Date()) % totalHadiths;
+                          const offset = favIndex - todayDaySinceStart;
 
-                          let offset = favIndex - todayIndex;
-                          if (offset > 0) {
-                            // If favorite is in the future, wrap it to the past
-                            offset = offset - totalHadiths;
+                          // Only change if not already showing this hadith
+                          if (index !== favIndex || currentView !== "hadith") {
+                            setDayOffset(offset);
+                            setCurrentView("hadith");
+                            setTimeout(
+                              () =>
+                                window.scrollTo({ top: 0, behavior: "smooth" }),
+                              100
+                            );
                           }
-
-                          setDayOffset(offset);
-                          setCurrentView("hadith");
                         }}
                         style={{
                           cursor: "pointer",
