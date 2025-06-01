@@ -213,7 +213,7 @@ export default function App() {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ minHeight: "100vh", minWidth: "100vw" }}>
       <Header
         style={{
           display: "flex",
@@ -224,14 +224,15 @@ export default function App() {
       >
         <div
           style={{
-            color: darkMode ? "#000" : "#fff", // text color for the title
+            color: darkMode ? "#000" : "#fff",
             fontWeight: "bold",
-            fontSize: 20,
+            fontSize: "clamp(0.5rem, 5vw, 1rem)", // responsive font size
             marginRight: 24,
           }}
         >
           Hadith App
         </div>
+
         <Menu
           theme={darkMode ? "light" : "dark"}
           mode="horizontal"

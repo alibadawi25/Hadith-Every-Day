@@ -46,12 +46,12 @@
   color: #fafafa !important; /* Bright accent color for contrast */
 }
 
-/* When using theme="light" (your darkMode case), style the bottom border (underline) */
-.ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
-  border-bottom: 2px solid #fafafa !important; /* White underline */
-}
-
 /* Hovered item underline */
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item:hover::after {
   border-bottom: 2px solid #444 !important;
+}
+
+/* When using theme="light" (your darkMode case), style the bottom border (underline) */
+.ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
+  border-bottom: 2px solid #fafafa !important; /* White underline */
 }
