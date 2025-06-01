@@ -206,7 +206,7 @@ export default function App() {
     padding: "0.6rem 1.2rem",
     borderRadius: 6,
     fontWeight: "bold",
-    backgroundColor: darkMode ? "#333" : "#007bff",
+    backgroundColor: darkMode ? "#333333cc" : "#007bffcc",
     color: darkMode ? "#eee" : "#fff",
     userSelect: "none",
     margin: "0 0.3rem",
@@ -351,40 +351,55 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-                  <button
-                    onClick={prevHadith}
-                    style={btnStyle}
-                    aria-label="Previous Hadith"
-                  >
-                    ← Previous
-                  </button>
-
-                  <button
-                    onClick={toggleFavorite}
+                  <div
                     style={{
-                      ...btnStyle,
-                      backgroundColor: isFavorite
-                        ? "#ffc107"
-                        : btnStyle.backgroundColor,
-                      color: isFavorite ? "#333" : btnStyle.color,
-                      minWidth: 150,
+                      position: "fixed",
+                      bottom: "5vh",
+                      left: 0,
+                      right: 0,
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: "1rem",
+                      flexWrap: "wrap",
+                      padding: "0 1rem",
+                      zIndex: 999,
                     }}
-                    aria-label="Toggle Favorite"
                   >
-                    {isFavorite ? "★ Favorited" : "☆ Add to Favorites"}
-                  </button>
+                    <button
+                      onClick={prevHadith}
+                      style={btnStyle}
+                      aria-label="Previous Hadith"
+                    >
+                      ← Previous
+                    </button>
 
-                  <button
-                    onClick={nextHadith}
-                    disabled={dayOffset === 0}
-                    style={{
-                      ...btnStyle,
-                      opacity: dayOffset === 0 ? 0.5 : 1,
-                    }}
-                    aria-label="Next Hadith"
-                  >
-                    Next →
-                  </button>
+                    <button
+                      onClick={toggleFavorite}
+                      style={{
+                        ...btnStyle,
+                        backgroundColor: isFavorite
+                          ? "#ffc107cc"
+                          : btnStyle.backgroundColor,
+                        color: isFavorite ? "#333" : btnStyle.color,
+                        minWidth: 150,
+                      }}
+                      aria-label="Toggle Favorite"
+                    >
+                      {isFavorite ? "★ Favorited" : "☆ Add to Favorites"}
+                    </button>
+
+                    <button
+                      onClick={nextHadith}
+                      disabled={dayOffset === 0}
+                      style={{
+                        ...btnStyle,
+                        opacity: dayOffset === 0 ? 0.5 : 1,
+                      }}
+                      aria-label="Next Hadith"
+                    >
+                      Next →
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
