@@ -73,10 +73,17 @@ export default function App() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [favorites, setFavorites] = useState(() => {
     const favs = localStorage.getItem(LOCAL_STORAGE_FAVORITES_KEY);
     return favs ? JSON.parse(favs) : [];
   });
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     fetch("/riyad_assalihin.json")
@@ -211,6 +218,7 @@ export default function App() {
     userSelect: "none",
     margin: "0 0.3rem",
   };
+  const isCompact = windowWidth < 480;
 
   return (
     <Layout style={{ minHeight: "100vh", minWidth: "100vw" }}>
@@ -302,7 +310,7 @@ export default function App() {
                     gap: "2rem",
                     flexWrap: "wrap",
                     justifyContent: "center",
-                    marginBottom: "2rem",
+                    marginBottom: "5rem",
                   }}
                 >
                   <div
@@ -370,7 +378,7 @@ export default function App() {
                       style={btnStyle}
                       aria-label="Previous Hadith"
                     >
-                      ← Previous
+                      {isCompact ? "⬅️" : "← Previous"}
                     </button>
 
                     <button
@@ -381,11 +389,17 @@ export default function App() {
                           ? "#ffc107cc"
                           : btnStyle.backgroundColor,
                         color: isFavorite ? "#333" : btnStyle.color,
-                        minWidth: 150,
+                        minWidth: isCompact ? 75 : 150,
                       }}
                       aria-label="Toggle Favorite"
                     >
-                      {isFavorite ? "★ Favorited" : "☆ Add to Favorites"}
+                      {isCompact
+                        ? isFavorite
+                          ? "★"
+                          : "☆"
+                        : isFavorite
+                        ? "★ Favorited"
+                        : "☆ Add to Favorites"}
                     </button>
 
                     <button
@@ -397,7 +411,7 @@ export default function App() {
                       }}
                       aria-label="Next Hadith"
                     >
-                      Next →
+                      {isCompact ? "➡️" : "Next →"}
                     </button>
                   </div>
                 </div>
