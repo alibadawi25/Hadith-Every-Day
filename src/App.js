@@ -1,314 +1,64 @@
-import React, { useEffect, useState } from "react";
-import { Layout, Menu, Alert } from "antd";
-import { WifiOutlined } from "@ant-design/icons";
+import React, { useState } from "react";
+import { Layout } from "antd";
 import "antd/dist/reset.css";
-import DarkModeToggle from "./components/DarkModeToggle";
-import "./App.css"; // Your overrides
+import "./App.css";
 
-const { Header, Content } = Layout;
-const LOCAL_STORAGE_FAVORITES_KEY = "hadith_favorites";
+// Components
+import AppHeader from "./components/AppHeader";
+import HadithView from "./components/HadithView";
+import FavoritesView from "./components/FavoritesView";
+import LoadingSpinner from "./components/LoadingSpinner";
+import ErrorMessage from "./components/ErrorMessage";
 
-function extractHadithText(fullText) {
-  if (fullText.length > 150) {
-    const splitIndex = fullText.indexOf('"');
-    if (splitIndex !== -1) {
-      return fullText.slice(splitIndex).trim(); // +3 to skip `: "`
-    }
-    return fullText; // fallback if pattern not found
-  }
-}
+// Hooks
+import {
+  useHadithData,
+  useFavorites,
+  useOnlineStatus,
+  useWindowWidth,
+} from "./hooks/useHadithApp";
 
-function HadithItem({ content, lang = "ltr" }) {
-  if (
-    content &&
-    typeof content === "object" &&
-    ("narrator" in content || "text" in content)
-  ) {
-    return (
-      <div style={{ marginBottom: "1.5rem", direction: lang }}>
-        {content.narrator && (
-          <div style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>
-            {content.narrator}
-          </div>
-        )}
-        {content.text && (
-          <div style={{ whiteSpace: "pre-wrap" }}>{content.text}</div>
-        )}
-      </div>
-    );
-  }
+// Utils
+import { calculateHadithIndex, formatDates } from "./utils/dateUtils";
 
-  if (typeof content === "object") {
-    const textContent = Object.values(content).join(" ");
-    return (
-      <div
-        style={{
-          whiteSpace: "pre-wrap",
-          direction: lang,
-          marginBottom: "1.5rem",
-        }}
-      >
-        {textContent}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      style={{
-        whiteSpace: "pre-wrap",
-        direction: lang,
-        marginBottom: "1.5rem",
-      }}
-    >
-      {content}
-    </div>
-  );
-}
+const { Content } = Layout;
 
 export default function App() {
   const [currentView, setCurrentView] = useState("hadith");
-  const [hadiths, setHadiths] = useState([]);
   const [dayOffset, setDayOffset] = useState(0);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [favorites, setFavorites] = useState(() => {
-    const favs = localStorage.getItem(LOCAL_STORAGE_FAVORITES_KEY);
-    return favs ? JSON.parse(favs) : [];
-  });
 
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  // Custom hooks
+  const { hadiths, loading, error } = useHadithData();
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const isOnline = useOnlineStatus();
+  const windowWidth = useWindowWidth();
 
-  // Add online/offline detection
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+  // Early returns for loading and error states
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage error={error} />;
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  // Enhanced data loading with offline fallback
-  useEffect(() => {
-    const loadHadiths = async () => {
-      try {
-        // Try to load from network first
-        const res = await fetch("/riyad_assalihin.json");
-        if (!res.ok) throw new Error("Failed to load hadith data");
-        const data = await res.json();
-
-        if (!data.hadiths || data.hadiths.length === 0) {
-          throw new Error("No hadiths found in data");
-        }
-
-        setHadiths(data.hadiths);
-        // Cache the data for offline use
-        localStorage.setItem("cached_hadiths", JSON.stringify(data.hadiths));
-        setLoading(false);
-      } catch (err) {
-        // Try to load from cache if network fails
-        const cachedHadiths = localStorage.getItem("cached_hadiths");
-        if (cachedHadiths) {
-          setHadiths(JSON.parse(cachedHadiths));
-          setLoading(false);
-          setError("Using offline data");
-        } else {
-          setError(err.message);
-          setLoading(false);
-        }
-      }
-    };
-
-    loadHadiths();
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(
-      LOCAL_STORAGE_FAVORITES_KEY,
-      JSON.stringify(favorites)
-    );
-  }, [favorites]);
-
-  if (loading)
-    return (
-      <div
-        style={{
-          padding: "2rem",
-          fontFamily: "Arial, sans-serif",
-          textAlign: "center",
-        }}
-      >
-        Loading hadith...
-      </div>
-    );
-
-  if (error)
-    return (
-      <div
-        style={{
-          padding: "2rem",
-          fontFamily: "Arial, sans-serif",
-          textAlign: "center",
-          color: "red",
-        }}
-      >
-        <p>Error: {error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            cursor: "pointer",
-            padding: "0.5rem 1rem",
-            borderRadius: 5,
-            border: "none",
-            backgroundColor: "#007bff",
-            color: "white",
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
-
-  const hadithsStartDate = new Date("2024-12-31"); // or any fixed past date
-  const today = new Date();
-  const offsetDate = new Date(today);
-  offsetDate.setDate(today.getDate() + dayOffset);
-
-  // Days since start date
-  const daySinceStart = Math.floor(
-    (offsetDate - hadithsStartDate) / (1000 * 60 * 60 * 24)
-  );
-
-  // Safely wrap around hadiths
-  const index =
-    hadiths.length > 0
-      ? ((daySinceStart % hadiths.length) + hadiths.length) % hadiths.length
-      : 0;
-
+  // Calculate current hadith
+  const { index, offsetDate } = calculateHadithIndex(hadiths, dayOffset);
   const hadith = hadiths[index];
+  const { gregorianString, hijriDate } = formatDates(offsetDate);
 
-  if (index === null) return null;
+  if (!hadith) return null;
 
-  const gregorianString = offsetDate.toLocaleDateString("en-GB");
-
-  const arabicMonths = [
-    "محرم",
-    "صفر",
-    "ربيع الأول",
-    "ربيع الآخر",
-    "جمادى الأولى",
-    "جمادى الآخرة",
-    "رجب",
-    "شعبان",
-    "رمضان",
-    "شوال",
-    "ذو القعدة",
-    "ذو الحجة",
-  ];
-
-  // Format date using Intl to get Arabic digits
-  const toArabicDigits = (n) =>
-    new Intl.NumberFormat("ar-EG", { useGrouping: false }).format(n);
-
-  const hijriDate = new Intl.DateTimeFormat("ar-SA-u-ca-islamic", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(offsetDate);
-
-  const isFavorite = favorites.some((fav) => fav.id === hadith.id);
-
-  const toggleFavorite = () => {
-    if (isFavorite) {
-      setFavorites(favorites.filter((fav) => fav.id !== hadith.id));
-    } else {
-      setFavorites([...favorites, hadith]);
-    }
-  };
-
+  // Navigation functions
   const prevHadith = () => setDayOffset((prev) => prev - 1);
-
   const nextHadith = () => {
     if (dayOffset < 0) setDayOffset((prev) => prev + 1);
   };
 
-  const btnStyle = {
-    cursor: "pointer",
-    border: "none",
-    padding: "0.6rem 1.2rem",
-    borderRadius: 6,
-    fontWeight: "bold",
-    backgroundColor: darkMode ? "#333333cc" : "#007bffcc",
-    color: darkMode ? "#eee" : "#fff",
-    userSelect: "none",
-    margin: "0 0.3rem",
-  };
-  const isCompact = windowWidth < 480;
-
   return (
     <Layout style={{ minHeight: "100vh", minWidth: "100vw" }}>
-      <Header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          backgroundColor: darkMode ? "#fff" : "#001529", // typical antd dark header bg or white
-          color: darkMode ? "#000" : "#fff",
-        }}
-      >
-        <div
-          style={{
-            color: darkMode ? "#000" : "#fff",
-            fontWeight: "bold",
-            fontSize: "clamp(0.5rem, 5vw, 1rem)",
-            marginRight: 24,
-          }}
-        >
-          Hadith App
-        </div>
-
-        <Menu
-          theme={darkMode ? "light" : "dark"}
-          mode="horizontal"
-          selectedKeys={[currentView]}
-          onClick={(e) => setCurrentView(e.key)}
-          style={{ flex: 1 }}
-        >
-          <Menu.Item key="hadith">Hadith</Menu.Item>
-          <Menu.Item key="favorites">Favorites</Menu.Item>
-        </Menu>
-      </Header>
-
-      {!isOnline && (
-        <Alert
-          message="You're currently offline"
-          description="Don't worry! Your favorites and cached content are still available."
-          type="info"
-          icon={<WifiOutlined />}
-          showIcon
-          style={{
-            margin: 0,
-            borderRadius: 0,
-            border: "none",
-            borderBottom: "1px solid #d9d9d9",
-            backgroundColor: darkMode ? "#1f1f1f" : "#f6ffed",
-            color: darkMode ? "#fff" : "#000",
-          }}
-          className={darkMode ? "dark-mode-alert" : ""}
-          closable={false}
-        />
-      )}
+      <AppHeader
+        darkMode={darkMode}
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        isOnline={isOnline}
+      />
 
       <Content
         style={{
@@ -318,319 +68,31 @@ export default function App() {
       >
         <div>
           {currentView === "hadith" && (
-            <div>
-              <div
-                style={{
-                  padding: "2rem",
-                  fontFamily: "'Arial', sans-serif",
-                  maxWidth: 900,
-                  margin: "auto",
-                  minHeight: "100vh",
-                  transition: "all 0.3s ease",
-                }}
-              >
-                <h1
-                  style={{
-                    textAlign: "center",
-                    marginBottom: "1rem",
-                    fontWeight: "bold",
-                    fontSize: "2rem",
-                  }}
-                >
-                  كل يوم حديث
-                </h1>
-                <p
-                  style={{
-                    textAlign: "center",
-                    fontSize: "1.1rem",
-                    marginBottom: "0.5rem",
-                    fontWeight: "500",
-                  }}
-                >
-                  Hadith For Date: {gregorianString}
-                </p>
-                <p
-                  style={{
-                    fontFamily: "'Amiri', serif",
-                    fontSize: "1.2rem",
-                    textAlign: "center",
-                    marginBottom: "2rem",
-                    fontWeight: "500",
-                  }}
-                >
-                  📅 الحديث للتاريخ الهجري: {hijriDate}
-                </p>
-                <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "2rem",
-                    flexWrap: "wrap",
-                    justifyContent: "center",
-                    marginBottom: "5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      minWidth: 320,
-                      border: "1px solid #ddd",
-                      borderRadius: 8,
-                      padding: "1rem",
-                      boxShadow: darkMode
-                        ? "0 2px 6px rgba(255,255,255,0.1)"
-                        : "0 2px 6px rgba(0,0,0,0.1)",
-                      fontSize: "1.3rem",
-                      lineHeight: "1.6",
-                      fontFamily: "'Amiri', serif",
-                      direction: "rtl",
-                      backgroundColor: darkMode ? "#333" : "#fafafa",
-                    }}
-                  >
-                    <h2 style={{ textAlign: "center", marginBottom: "1rem" }}>
-                      النص العربي
-                    </h2>
-                    <HadithItem content={hadith.arabic} lang="rtl" />
-                  </div>
-
-                  <div
-                    style={{
-                      flex: 1,
-                      minWidth: 320,
-                      border: "1px solid #ddd",
-                      borderRadius: 8,
-                      padding: "1rem",
-                      boxShadow: darkMode
-                        ? "0 2px 6px rgba(255,255,255,0.1)"
-                        : "0 2px 6px rgba(0,0,0,0.1)",
-                      fontSize: "1rem",
-                      lineHeight: "1.6",
-                      backgroundColor: darkMode ? "#333" : "#fafafa",
-                      color: darkMode ? "#eee" : "#333",
-                    }}
-                  >
-                    <h2 style={{ textAlign: "center", marginBottom: "1rem" }}>
-                      English Text
-                    </h2>
-                    <HadithItem content={hadith.english} lang="ltr" />
-                  </div>
-                </div>
-                <div style={{ textAlign: "center", marginBottom: "1rem" }}>
-                  <div
-                    style={{
-                      position: "fixed",
-                      bottom: "5vh",
-                      left: 0,
-                      right: 0,
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: "1rem",
-                      flexWrap: "wrap",
-                      padding: "0 1rem",
-                      zIndex: 999,
-                    }}
-                  >
-                    <button
-                      onClick={prevHadith}
-                      style={btnStyle}
-                      aria-label="Previous Hadith"
-                    >
-                      {isCompact ? "⬅️" : "← Previous"}
-                    </button>
-
-                    <button
-                      onClick={toggleFavorite}
-                      style={{
-                        ...btnStyle,
-                        backgroundColor: isFavorite
-                          ? "#ffc107cc"
-                          : btnStyle.backgroundColor,
-                        color: isFavorite ? "#333" : btnStyle.color,
-                        minWidth: isCompact ? 75 : 150,
-                      }}
-                      aria-label="Toggle Favorite"
-                    >
-                      {isCompact
-                        ? isFavorite
-                          ? "★"
-                          : "☆"
-                        : isFavorite
-                        ? "★ Favorited"
-                        : "☆ Add to Favorites"}
-                    </button>
-
-                    <button
-                      onClick={nextHadith}
-                      disabled={dayOffset === 0}
-                      style={{
-                        ...btnStyle,
-                        opacity: dayOffset === 0 ? 0.5 : 1,
-                      }}
-                      aria-label="Next Hadith"
-                    >
-                      {isCompact ? "➡️" : "Next →"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <HadithView
+              hadith={hadith}
+              gregorianString={gregorianString}
+              hijriDate={hijriDate}
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
+              windowWidth={windowWidth}
+              prevHadith={prevHadith}
+              nextHadith={nextHadith}
+              toggleFavorite={() => toggleFavorite(hadith)}
+              isFavorite={isFavorite(hadith)}
+              dayOffset={dayOffset}
+            />
           )}
           {currentView === "favorites" && (
-            <div
-              style={{
-                padding: "2rem",
-                fontFamily: "'Arial', sans-serif",
-                maxWidth: 900,
-                margin: "auto",
-                minHeight: "100vh",
-                transition: "all 0.3s ease",
-              }}
-            >
-              <header style={{ marginBottom: "2rem", textAlign: "center" }}>
-                <h1 style={{ fontWeight: "bold", fontSize: "2rem" }}>
-                  Favorites
-                </h1>
-                <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-
-                {favorites.length === 0 && (
-                  <div
-                    style={{
-                      marginTop: "2rem",
-                      padding: "2rem",
-                      backgroundColor: darkMode ? "#333" : "#f8f9fa",
-                      borderRadius: "8px",
-                      border: darkMode ? "1px solid #555" : "1px solid #e9ecef",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>
-                      ⭐
-                    </div>
-                    <h3
-                      style={{
-                        marginBottom: "1rem",
-                        color: darkMode ? "#fff" : "#333",
-                        fontSize: "1.2rem",
-                      }}
-                    >
-                      No favorites yet
-                    </h3>
-                    <p
-                      style={{
-                        color: darkMode ? "#bbb" : "#666",
-                        lineHeight: "1.6",
-                        maxWidth: "400px",
-                        margin: "0 auto",
-                      }}
-                    >
-                      Start building your personal collection! When you find a
-                      hadith that speaks to you, tap the <strong>★ Star</strong>{" "}
-                      button to save it here. Your favorites will be available
-                      offline and you can return to them anytime by clicking on
-                      them.
-                    </p>
-                  </div>
-                )}
-              </header>
-
-              <ul
-                style={{
-                  listStyle: "none",
-                  paddingLeft: 0,
-                  maxHeight: "70vh",
-                  overflowY: "auto",
-                  borderTop: darkMode ? "1px solid #ddd" : "1px solid #444",
-                }}
-              >
-                {favorites.map((fav) => {
-                  const hadithOnly = extractHadithText(fav.arabic);
-                  return (
-                    <li
-                      key={fav.id}
-                      style={{
-                        marginBottom: "1.5rem",
-                        paddingTop: "1rem",
-                        borderBottom: darkMode
-                          ? "1px solid #ddd"
-                          : "1px solid #444",
-                      }}
-                    >
-                      <button
-                        onClick={() => {
-                          // Always use the real current date, not offsetDate
-                          const hadithsStartDate = new Date("2024-12-31");
-                          const today = new Date();
-                          const todayDaySinceStart = Math.floor(
-                            (today - hadithsStartDate) / (1000 * 60 * 60 * 24)
-                          );
-                          const favIndex = hadiths.findIndex(
-                            (h) => h.id === fav.id
-                          );
-                          const offset = favIndex - todayDaySinceStart;
-
-                          // Only change if not already showing this hadith
-                          if (index !== favIndex || currentView !== "hadith") {
-                            setDayOffset(offset);
-                            setCurrentView("hadith");
-                            setTimeout(
-                              () =>
-                                window.scrollTo({ top: 0, behavior: "smooth" }),
-                              100
-                            );
-                          }
-                        }}
-                        style={{
-                          cursor: "pointer",
-                          background: "none",
-                          border: "none",
-                          color: darkMode ? "#007acc" : "#66aaff",
-                          textDecoration: "underline",
-                          fontSize: "1.1rem",
-                          padding: 0,
-                          display: "block",
-                          textAlign: "left",
-                          transition: "color 0.2s ease",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.color = darkMode
-                            ? "#005a99"
-                            : "#4488cc")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.color = darkMode
-                            ? "#007acc"
-                            : "#66aaff")
-                        }
-                        aria-label={`View hadith: ${hadithOnly.slice(
-                          0,
-                          30
-                        )}...`}
-                      >
-                        <span
-                          style={{ direction: "rtl", unicodeBidi: "plaintext" }}
-                        >
-                          {hadithOnly.length > 130
-                            ? hadithOnly.slice(0, 130) + "..."
-                            : hadithOnly}
-                        </span>
-                      </button>
-                      <small
-                        style={{
-                          color: darkMode ? "#666" : "#bbb",
-                          display: "block",
-                          marginTop: "0.3rem",
-                          fontSize: "0.85rem",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        Book ID: {fav.bookId}, Chapter ID: {fav.chapterId}
-                      </small>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+            <FavoritesView
+              favorites={favorites}
+              darkMode={darkMode}
+              setDarkMode={setDarkMode}
+              hadiths={hadiths}
+              index={index}
+              currentView={currentView}
+              setDayOffset={setDayOffset}
+              setCurrentView={setCurrentView}
+            />
           )}
         </div>
       </Content>
