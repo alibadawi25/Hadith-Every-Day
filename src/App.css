@@ -51,6 +51,12 @@
   border-bottom: 2px solid #444 !important;
 }
 
+/* Dark mode offline alert styling */
+.dark-mode-alert .ant-alert-message,
+.dark-mode-alert .ant-alert-description {
+  color: #fafafa !important; /* Dark text for better contrast on warning background */
+}
+
 /* When using theme="light" (your darkMode case), style the bottom border (underline) */
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
   border-bottom: 2px solid #fafafa !important; /* White underline */

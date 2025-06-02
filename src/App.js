@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Layout, Menu } from "antd";
+import { Layout, Menu, Alert } from "antd";
+import { WifiOutlined } from "@ant-design/icons";
 import "antd/dist/reset.css";
 import DarkModeToggle from "./components/DarkModeToggle";
 import "./App.css"; // Your overrides
@@ -67,13 +68,13 @@ function HadithItem({ content, lang = "ltr" }) {
 
 export default function App() {
   const [currentView, setCurrentView] = useState("hadith");
-
   const [hadiths, setHadiths] = useState([]);
   const [dayOffset, setDayOffset] = useState(0);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [favorites, setFavorites] = useState(() => {
     const favs = localStorage.getItem(LOCAL_STORAGE_FAVORITES_KEY);
     return favs ? JSON.parse(favs) : [];
@@ -85,22 +86,52 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Add online/offline detection
   useEffect(() => {
-    fetch("/riyad_assalihin.json")
-      .then((res) => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Enhanced data loading with offline fallback
+  useEffect(() => {
+    const loadHadiths = async () => {
+      try {
+        // Try to load from network first
+        const res = await fetch("/riyad_assalihin.json");
         if (!res.ok) throw new Error("Failed to load hadith data");
-        return res.json();
-      })
-      .then((data) => {
-        if (!data.hadiths || data.hadiths.length === 0)
+        const data = await res.json();
+
+        if (!data.hadiths || data.hadiths.length === 0) {
           throw new Error("No hadiths found in data");
+        }
+
         setHadiths(data.hadiths);
+        // Cache the data for offline use
+        localStorage.setItem("cached_hadiths", JSON.stringify(data.hadiths));
         setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
+      } catch (err) {
+        // Try to load from cache if network fails
+        const cachedHadiths = localStorage.getItem("cached_hadiths");
+        if (cachedHadiths) {
+          setHadiths(JSON.parse(cachedHadiths));
+          setLoading(false);
+          setError("Using offline data");
+        } else {
+          setError(err.message);
+          setLoading(false);
+        }
+      }
+    };
+
+    loadHadiths();
   }, []);
 
   useEffect(() => {
@@ -240,7 +271,7 @@ export default function App() {
           style={{
             color: darkMode ? "#000" : "#fff",
             fontWeight: "bold",
-            fontSize: "clamp(0.5rem, 5vw, 1rem)", // responsive font size
+            fontSize: "clamp(0.5rem, 5vw, 1rem)",
             marginRight: 24,
           }}
         >
@@ -258,6 +289,27 @@ export default function App() {
           <Menu.Item key="favorites">Favorites</Menu.Item>
         </Menu>
       </Header>
+
+      {!isOnline && (
+        <Alert
+          message="You're currently offline"
+          description="Don't worry! Your favorites and cached content are still available."
+          type="info"
+          icon={<WifiOutlined />}
+          showIcon
+          style={{
+            margin: 0,
+            borderRadius: 0,
+            border: "none",
+            borderBottom: "1px solid #d9d9d9",
+            backgroundColor: darkMode ? "#1f1f1f" : "#f6ffed",
+            color: darkMode ? "#fff" : "#000",
+          }}
+          className={darkMode ? "dark-mode-alert" : ""}
+          closable={false}
+        />
+      )}
+
       <Content
         style={{
           backgroundColor: darkMode ? "#222" : "#fefefe",
@@ -442,15 +494,43 @@ export default function App() {
                 <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
 
                 {favorites.length === 0 && (
-                  <p
+                  <div
                     style={{
-                      fontStyle: "italic",
-                      marginTop: "1rem",
-                      color: darkMode ? "#666" : "#bbb",
+                      marginTop: "2rem",
+                      padding: "2rem",
+                      backgroundColor: darkMode ? "#333" : "#f8f9fa",
+                      borderRadius: "8px",
+                      border: darkMode ? "1px solid #555" : "1px solid #e9ecef",
+                      textAlign: "center",
                     }}
                   >
-                    You have no favorites saved yet.
-                  </p>
+                    <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>
+                      ⭐
+                    </div>
+                    <h3
+                      style={{
+                        marginBottom: "1rem",
+                        color: darkMode ? "#fff" : "#333",
+                        fontSize: "1.2rem",
+                      }}
+                    >
+                      No favorites yet
+                    </h3>
+                    <p
+                      style={{
+                        color: darkMode ? "#bbb" : "#666",
+                        lineHeight: "1.6",
+                        maxWidth: "400px",
+                        margin: "0 auto",
+                      }}
+                    >
+                      Start building your personal collection! When you find a
+                      hadith that speaks to you, tap the <strong>★ Star</strong>{" "}
+                      button to save it here. Your favorites will be available
+                      offline and you can return to them anytime by clicking on
+                      them.
+                    </p>
+                  </div>
                 )}
               </header>
 
